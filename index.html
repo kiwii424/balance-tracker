@@ -143,6 +143,17 @@
             margin-top: 8px;
         }
 
+        .date-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .date-row .field {
+            min-width: 220px;
+        }
+
         button {
             border: none;
             border-radius: 999px;
@@ -319,9 +330,16 @@
         </header>
 
         <section class="card">
-            <div class="field">
-                <label for="todayDate">今天日期</label>
-                <input type="date" id="todayDate" disabled>
+            <div class="date-row">
+                <div class="field">
+                    <label for="todayDate">今天日期</label>
+                    <input type="date" id="todayDate" disabled>
+                </div>
+                <div class="action-row">
+                    <button class="ghost" id="exportBtn" type="button">匯出</button>
+                    <button class="ghost" id="importBtn" type="button">匯入（覆蓋）</button>
+                    <input type="file" id="importFileInput" accept="application/json" style="display: none;">
+                </div>
             </div>
         </section>
 
@@ -392,6 +410,9 @@
         const eventAmountInput = document.getElementById("eventAmount");
         const addEventBtn = document.getElementById("addEventBtn");
         const clearEventsBtn = document.getElementById("clearEventsBtn");
+        const exportBtn = document.getElementById("exportBtn");
+        const importBtn = document.getElementById("importBtn");
+        const importFileInput = document.getElementById("importFileInput");
         const futureList = document.getElementById("futureList");
         const pastList = document.getElementById("pastList");
 
@@ -688,6 +709,77 @@
             renderAll();
         }
 
+        function buildExportData() {
+            return {
+                type: "daily-balance",
+                version: 1,
+                exportedAt: new Date().toISOString(),
+                cash: Number(state.cash || 0),
+                stock: Number(state.stock || 0),
+                events: state.events.map((event) => ({
+                    id: event.id,
+                    date: event.date,
+                    title: event.title,
+                    amount: Number(event.amount || 0)
+                }))
+            };
+        }
+
+        function handleExport() {
+            const payload = buildExportData();
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            const stamp = toDateInputValue(new Date());
+            link.href = url;
+            link.download = `daily-balance-${stamp}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        function applyImportedData(data) {
+            if (!data || data.type !== "daily-balance" || data.version !== 1) {
+                alert("檔案格式不正確，請使用匯出的 JSON 檔。");
+                return false;
+            }
+
+            const importedEvents = Array.isArray(data.events) ? data.events : [];
+            state.cash = Number(data.cash || 0);
+            state.stock = Number(data.stock || 0);
+            state.events = importedEvents.map((event, index) => ({
+                id: typeof event.id === "number" ? event.id : Date.now() + index,
+                date: String(event.date || ""),
+                title: String(event.title || ""),
+                amount: Number(event.amount || 0)
+            })).filter((event) => event.date && event.title);
+
+            saveState();
+            syncInputs();
+            renderAll();
+            return true;
+        }
+
+        function handleImportFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (applyImportedData(data)) {
+                        alert("匯入成功。");
+                    }
+                } catch (error) {
+                    alert("檔案內容不是有效的 JSON。");
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = "";
+        }
+
         function init() {
             loadState();
             syncInputs();
@@ -708,6 +800,9 @@
 
         addEventBtn.addEventListener("click", addEvent);
         clearEventsBtn.addEventListener("click", clearEvents);
+        exportBtn.addEventListener("click", handleExport);
+        importBtn.addEventListener("click", () => importFileInput.click());
+        importFileInput.addEventListener("change", handleImportFile);
         futureList.addEventListener("click", handleEventAction);
         pastList.addEventListener("click", handleEventAction);
 
