@@ -248,6 +248,16 @@
             text-align: right;
         }
 
+        .balance.low {
+            color: #b91c1c;
+            background: rgba(251, 146, 60, 0.2);
+            border-radius: 999px;
+            padding: 6px 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
         .muted {
             color: var(--muted);
         }
@@ -455,22 +465,30 @@
             const uniqueDates = [...new Set(futureEvents.map((event) => event.date))]
                 .sort((a, b) => parseDate(a) - parseDate(b));
             let runningBalance = Number(state.cash || 0);
-
-            uniqueDates.forEach((dateStr) => {
+            const daySummaries = uniqueDates.map((dateStr) => {
                 const events = futureEvents.filter((event) => event.date === dateStr);
                 const dailySum = events.reduce((sum, event) => sum + Number(event.amount || 0), 0);
                 runningBalance += dailySum;
+                return {
+                    dateStr,
+                    events,
+                    balance: runningBalance
+                };
+            });
 
+            const minBalance = Math.min(...daySummaries.map((day) => day.balance));
+
+            daySummaries.forEach((day) => {
                 const dayCard = document.createElement("div");
                 dayCard.className = "day-card";
 
                 const dateEl = document.createElement("h4");
-                dateEl.textContent = formatDateLabel(dateStr);
+                dateEl.textContent = formatDateLabel(day.dateStr);
 
                 const eventsEl = document.createElement("div");
                 eventsEl.className = "events";
 
-                events.forEach((event) => {
+                day.events.forEach((event) => {
                     const item = document.createElement("div");
                     item.className = "event-item";
 
@@ -510,8 +528,9 @@
                 });
 
                 const balanceEl = document.createElement("div");
-                balanceEl.className = "balance";
-                balanceEl.textContent = `餘額：${formatNumber(runningBalance)}`;
+                const isLowest = day.balance === minBalance;
+                balanceEl.className = isLowest ? "balance low" : "balance";
+                balanceEl.textContent = `餘額：${formatNumber(day.balance)}`;
 
                 dayCard.append(dateEl, eventsEl, balanceEl);
                 futureList.appendChild(dayCard);
