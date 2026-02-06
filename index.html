@@ -306,7 +306,6 @@
     <div class="container">
         <header>
             <h1>每日餘額計算器</h1>
-            <p>輸入今天的餘額與未來事件，系統會預估未來日期的餘額變化。同時保留已經發生的紀錄，方便對照。</p>
         </header>
 
         <section class="card">
@@ -345,7 +344,7 @@
                     <input type="text" id="eventTitle" placeholder="例如：股票、房租、獎金">
                 </div>
                 <div class="field">
-                    <label for="eventAmount">金額（有正負）</label>
+                    <label for="eventAmount">金額</label>
                     <input type="number" id="eventAmount" placeholder="例如：-12786 或 13437">
                 </div>
             </div>
@@ -453,12 +452,11 @@
                 return;
             }
 
-            const maxDate = parseDate(futureEvents[futureEvents.length - 1].date);
-            let cursor = addDays(today, 1);
+            const uniqueDates = [...new Set(futureEvents.map((event) => event.date))]
+                .sort((a, b) => parseDate(a) - parseDate(b));
             let runningBalance = Number(state.cash || 0);
 
-            while (cursor <= maxDate) {
-                const dateStr = toDateInputValue(cursor);
+            uniqueDates.forEach((dateStr) => {
                 const events = futureEvents.filter((event) => event.date === dateStr);
                 const dailySum = events.reduce((sum, event) => sum + Number(event.amount || 0), 0);
                 runningBalance += dailySum;
@@ -472,48 +470,44 @@
                 const eventsEl = document.createElement("div");
                 eventsEl.className = "events";
 
-                if (events.length === 0) {
-                    eventsEl.innerHTML = '<div class="muted">無事件</div>';
-                } else {
-                    events.forEach((event) => {
-                        const item = document.createElement("div");
-                        item.className = "event-item";
+                events.forEach((event) => {
+                    const item = document.createElement("div");
+                    item.className = "event-item";
 
-                        const info = document.createElement("div");
-                        info.className = "event-info";
+                    const info = document.createElement("div");
+                    info.className = "event-info";
 
-                        const titleSpan = document.createElement("span");
-                        titleSpan.textContent = event.title;
+                    const titleSpan = document.createElement("span");
+                    titleSpan.textContent = event.title;
 
-                        const amountSpan = document.createElement("span");
-                        const amountClass = Number(event.amount) >= 0 ? "positive" : "negative";
-                        amountSpan.className = `amount ${amountClass}`;
-                        amountSpan.textContent = formatNumber(event.amount);
+                    const amountSpan = document.createElement("span");
+                    const amountClass = Number(event.amount) >= 0 ? "positive" : "negative";
+                    amountSpan.className = `amount ${amountClass}`;
+                    amountSpan.textContent = formatNumber(event.amount);
 
-                        info.append(titleSpan, amountSpan);
+                    info.append(titleSpan, amountSpan);
 
-                        const actions = document.createElement("div");
-                        actions.className = "event-actions";
+                    const actions = document.createElement("div");
+                    actions.className = "event-actions";
 
-                        const editBtn = document.createElement("button");
-                        editBtn.type = "button";
-                        editBtn.className = "mini-btn edit";
-                        editBtn.dataset.action = "edit";
-                        editBtn.dataset.id = String(event.id);
-                        editBtn.textContent = "編輯";
+                    const editBtn = document.createElement("button");
+                    editBtn.type = "button";
+                    editBtn.className = "mini-btn edit";
+                    editBtn.dataset.action = "edit";
+                    editBtn.dataset.id = String(event.id);
+                    editBtn.textContent = "編輯";
 
-                        const deleteBtn = document.createElement("button");
-                        deleteBtn.type = "button";
-                        deleteBtn.className = "mini-btn delete";
-                        deleteBtn.dataset.action = "delete";
-                        deleteBtn.dataset.id = String(event.id);
-                        deleteBtn.textContent = "刪除";
+                    const deleteBtn = document.createElement("button");
+                    deleteBtn.type = "button";
+                    deleteBtn.className = "mini-btn delete";
+                    deleteBtn.dataset.action = "delete";
+                    deleteBtn.dataset.id = String(event.id);
+                    deleteBtn.textContent = "刪除";
 
-                        actions.append(editBtn, deleteBtn);
-                        item.append(info, actions);
-                        eventsEl.appendChild(item);
-                    });
-                }
+                    actions.append(editBtn, deleteBtn);
+                    item.append(info, actions);
+                    eventsEl.appendChild(item);
+                });
 
                 const balanceEl = document.createElement("div");
                 balanceEl.className = "balance";
@@ -521,9 +515,7 @@
 
                 dayCard.append(dateEl, eventsEl, balanceEl);
                 futureList.appendChild(dayCard);
-
-                cursor = addDays(cursor, 1);
-            }
+            });
         }
 
         function renderPastList() {
