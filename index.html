@@ -354,13 +354,17 @@
                     <div class="value" id="todayBalance">0</div>
                 </div>
                 <div class="stat">
-                    <label for="cashInput">資金</label>
+                    <label for="cashInput">資金（當前餘額）</label>
                     <input type="number" id="cashInput" placeholder="輸入資金">
                 </div>
                 <div class="stat">
                     <label for="stockInput">股票市值</label>
                     <input type="number" id="stockInput" placeholder="輸入股票市值">
                 </div>
+            </div>
+            <div class="action-row" style="align-items: center;">
+                <button class="primary" id="settleTodayBtn" type="button">更新資金為今日餘額</button>
+                <span class="muted">日期跨日時會自動結轉，也可以手動執行。</span>
             </div>
         </section>
 
@@ -420,6 +424,7 @@
         const futureList = document.getElementById("futureList");
         const pastList = document.getElementById("pastList");
         const todayBalanceEl = document.getElementById("todayBalance");
+        const settleTodayBtn = document.getElementById("settleTodayBtn");
 
         const STORAGE_KEY = "dailyBalanceTracker";
 
@@ -452,19 +457,20 @@
 
         function loadState() {
             const saved = localStorage.getItem(STORAGE_KEY);
+            const today = toDateInputValue(new Date());
             if (!saved) {
-                const today = new Date();
-                state.todayDate = toDateInputValue(today);
+                state.todayDate = today;
                 return;
             }
             try {
                 const data = JSON.parse(saved);
                 Object.assign(state, data);
             } catch (error) {
-                const today = new Date();
-                state.todayDate = toDateInputValue(today);
+                state.todayDate = today;
             }
-            state.todayDate = toDateInputValue(new Date());
+            if (!state.todayDate) {
+                state.todayDate = today;
+            }
         }
 
         function saveState() {
@@ -486,6 +492,23 @@
                 .filter((event) => parseDate(event.date) <= today)
                 .reduce((sum, event) => sum + Number(event.amount || 0), 0);
             return Number(state.cash || 0) + pastTotal;
+        }
+
+        function computeBalanceUpTo(targetDate) {
+            const target = parseDate(targetDate);
+            const appliedEvents = state.events.filter((event) => parseDate(event.date) <= target);
+            const appliedSum = appliedEvents.reduce((sum, event) => sum + Number(event.amount || 0), 0);
+            return { target, appliedSum };
+        }
+
+        function settleToDate(targetDate) {
+            const { target, appliedSum } = computeBalanceUpTo(targetDate);
+            state.cash = Number(state.cash || 0) + appliedSum;
+            state.events = state.events.filter((event) => parseDate(event.date) > target);
+            state.todayDate = targetDate;
+            saveState();
+            syncInputs();
+            renderAll();
         }
 
         function renderFutureList() {
@@ -689,9 +712,20 @@
         function syncInputs() {
             cashInput.value = state.cash || "";
             stockInput.value = state.stock || "";
-            state.todayDate = toDateInputValue(new Date());
             todayDateInput.value = state.todayDate;
             eventDateInput.value = state.todayDate;
+        }
+
+        function handleDateRollover() {
+            const actualToday = toDateInputValue(new Date());
+            const storedDate = state.todayDate || actualToday;
+            if (parseDate(actualToday) > parseDate(storedDate)) {
+                settleToDate(actualToday);
+                return true;
+            }
+            state.todayDate = actualToday;
+            saveState();
+            return false;
         }
 
         function addEvent() {
@@ -731,6 +765,7 @@
                 type: "daily-balance",
                 version: 1,
                 exportedAt: new Date().toISOString(),
+                todayDate: state.todayDate,
                 cash: Number(state.cash || 0),
                 stock: Number(state.stock || 0),
                 events: state.events.map((event) => ({
@@ -765,12 +800,18 @@
             const importedEvents = Array.isArray(data.events) ? data.events : [];
             state.cash = Number(data.cash || 0);
             state.stock = Number(data.stock || 0);
+            state.todayDate = data.todayDate || toDateInputValue(new Date());
             state.events = importedEvents.map((event, index) => ({
                 id: typeof event.id === "number" ? event.id : Date.now() + index,
                 date: String(event.date || ""),
                 title: String(event.title || ""),
                 amount: Number(event.amount || 0)
             })).filter((event) => event.date && event.title);
+
+            const settled = handleDateRollover();
+            if (settled) {
+                return true;
+            }
 
             saveState();
             syncInputs();
@@ -799,6 +840,10 @@
 
         function init() {
             loadState();
+            const settled = handleDateRollover();
+            if (settled) {
+                return;
+            }
             syncInputs();
             renderAll();
         }
@@ -822,6 +867,10 @@
         importFileInput.addEventListener("change", handleImportFile);
         futureList.addEventListener("click", handleEventAction);
         pastList.addEventListener("click", handleEventAction);
+        settleTodayBtn.addEventListener("click", () => {
+            const today = toDateInputValue(new Date());
+            settleToDate(today);
+        });
 
         init();
     </script>
