@@ -95,6 +95,10 @@
             color: var(--ink);
         }
 
+        .stat .value.negative {
+            color: #dc2626;
+        }
+
         .stat input {
             width: 100%;
             padding: 10px 12px;
@@ -259,8 +263,11 @@
             text-align: right;
         }
 
-        .balance.low {
+        .balance.negative {
             color: #b91c1c;
+        }
+
+        .balance.low {
             background: rgba(251, 146, 60, 0.2);
             border-radius: 999px;
             padding: 6px 10px;
@@ -483,6 +490,7 @@
             totalAssetsEl.textContent = formatNumber(total);
             if (todayBalanceEl) {
                 todayBalanceEl.textContent = formatNumber(todayBalance);
+                todayBalanceEl.classList.toggle("negative", todayBalance < 0);
             }
         }
 
@@ -590,7 +598,10 @@
 
                 const balanceEl = document.createElement("div");
                 const isLowest = day.balance === minBalance;
-                balanceEl.className = isLowest ? "balance low" : "balance";
+                const balanceClasses = ["balance"];
+                if (isLowest) balanceClasses.push("low");
+                if (day.balance < 0) balanceClasses.push("negative");
+                balanceEl.className = balanceClasses.join(" ");
                 balanceEl.textContent = `餘額：${formatNumber(day.balance)}`;
 
                 dayCard.append(dateEl, eventsEl, balanceEl);
