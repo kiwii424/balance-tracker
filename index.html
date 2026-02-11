@@ -350,6 +350,10 @@
                     <div class="value" id="totalAssets">0</div>
                 </div>
                 <div class="stat">
+                    <label>當日餘額</label>
+                    <div class="value" id="todayBalance">0</div>
+                </div>
+                <div class="stat">
                     <label for="cashInput">資金</label>
                     <input type="number" id="cashInput" placeholder="輸入資金">
                 </div>
@@ -415,6 +419,7 @@
         const importFileInput = document.getElementById("importFileInput");
         const futureList = document.getElementById("futureList");
         const pastList = document.getElementById("pastList");
+        const todayBalanceEl = document.getElementById("todayBalance");
 
         const STORAGE_KEY = "dailyBalanceTracker";
 
@@ -467,8 +472,20 @@
         }
 
         function renderTotals() {
-            const total = Number(state.cash || 0) + Number(state.stock || 0);
+            const todayBalance = getTodayBalance();
+            const total = todayBalance + Number(state.stock || 0);
             totalAssetsEl.textContent = formatNumber(total);
+            if (todayBalanceEl) {
+                todayBalanceEl.textContent = formatNumber(todayBalance);
+            }
+        }
+
+        function getTodayBalance() {
+            const today = parseDate(state.todayDate);
+            const pastTotal = state.events
+                .filter((event) => parseDate(event.date) <= today)
+                .reduce((sum, event) => sum + Number(event.amount || 0), 0);
+            return Number(state.cash || 0) + pastTotal;
         }
 
         function renderFutureList() {
@@ -485,7 +502,7 @@
 
             const uniqueDates = [...new Set(futureEvents.map((event) => event.date))]
                 .sort((a, b) => parseDate(a) - parseDate(b));
-            let runningBalance = Number(state.cash || 0);
+            let runningBalance = getTodayBalance();
             const daySummaries = uniqueDates.map((dateStr) => {
                 const events = futureEvents.filter((event) => event.date === dateStr);
                 const dailySum = events.reduce((sum, event) => sum + Number(event.amount || 0), 0);
